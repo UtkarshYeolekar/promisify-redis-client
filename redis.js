@@ -10,14 +10,46 @@ let bluebird = require("bluebird"),
 bluebird.promisifyAll(redis.RedisClient.prototype);
 
 
-let redisClient= redis.createClient(redisConfig().port,redisConfig().host);
+let redisClient = null;
+module.exports = {
 
-module.exports = () => {
-    return {
+        initRedisClient : () =>{
+            redisClient =  redis.createClient(redisConfig().port,redisConfig().host)
+            logger.debug("Initalizing Redis Client");
 
-        redisClient: redisClient,
+            redisClient.on('ready',function() {
+            logger.debug(" subs Redis is ready");
+            });
 
-        getKeyValue: key => {
+            redisClient.on('connect',function(){
+                logger.debug('subs connected to redis');
+                isRedisConnected = true;
+            });
+
+            redisClient.on("message", function(channel, message) {
+                logger.info("message recieved on channel :", channel);
+                callback(channel,message);
+            });
+
+            redisClient.on("error", function (err) {
+                logger.debug("Error occurred while connecting to redis " + err);
+                isRedisConnected = false;
+            });
+
+            redisClient.on('reconnecting',function(err){
+                    tryReconnecting++;
+                    logger.warn('reconnecting');
+                    if(tryReconnecting >= maxReconnectingTry)
+                    {
+                        logger.error(err);
+                        redisClient.quit();
+                    }
+            });
+        },
+
+        //redisClient: redisClient,
+
+        getKeyValue: (key) => {
             return redisClient.getAsync(key)
                 .then((res, err) => err ? Promise.reject("getKeyValue : "+err) : Promise.resolve(res));
         },
@@ -46,35 +78,5 @@ module.exports = () => {
              callback = cb; 
         }
     }
-}
-logger.debug("Initalizing Redis Client");
 
-redisClient.on('ready',function() {
- logger.debug("Redis is ready");
-});
-
-redisClient.on('connect',function(){
-    logger.debug('connected to redis');
-    isRedisConnected = true;
-});
-
-redisClient.on("message", function(channel, message) {
-    logger.info("message recieved on channel :", channel);
-    callback(channel,message);
-});
-
-redisClient.on("error", function (err) {
-    logger.debug("Error occurred while connecting to redis " + err);
-    isRedisConnected = false;
-});
-
-redisClient.on('reconnecting',function(err){
-        tryReconnecting++;
-        logger.warn('reconnecting');
-        if(tryReconnecting >= maxReconnectingTry)
-        {
-            logger.error(err);
-            redisClient.quit();
-        }
-});
 

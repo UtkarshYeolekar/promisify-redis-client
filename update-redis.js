@@ -12,8 +12,9 @@ const channel = "deployment";
 .then((res) => redis().doesKeyExist(key))*/
 module.exports = {
     updateRedis: () => {
-      return redis().doesKeyExist(key)
-        .then((res) => res ? redis().getKeyValue(key) : null)
+    redis.initRedisClient();
+      return redis.doesKeyExist(key)
+        .then((res) => res ? redis.getKeyValue(key) : null)
         .then((res) => {
             if (res != null) {
                 logger.info("Current Deployed Version", res);
@@ -23,20 +24,20 @@ module.exports = {
             }
             else
                 _deploymentVersion = versionLabel + _baseVersion;
-            redis().setKeyValue(key, _deploymentVersion)
+            redis.setKeyValue(key, _deploymentVersion)
         })
         .then((res) => {
             logger.info("version updated to : ", _deploymentVersion);
             let message = JSON.stringify({ "_deploymentVersion": _deploymentVersion });
-            return redis().publishMessage(channel, message);
+            return redis.publishMessage(channel, message);
         }).then((res) => {
             logger.info("message published to channel :", channel);
-            redis().endConnection();
+            redis.endConnection();
             return Promise.resolve("Redis Updated and message published");
         })
         .catch((res) => {
             logger.error("catch block :->", res);
-            redis().endConnection();
+            redis.endConnection();
             return Promise.reject("Error in updating redis",res);
         });
 
